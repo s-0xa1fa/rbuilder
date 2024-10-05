@@ -197,7 +197,7 @@ impl BlockSealingBidder {
         let now = time::OffsetDateTime::now_utc();
         let ms_into_slot = (now - self.slot_timestamp).whole_milliseconds();
         let should_start = ms_into_slot >= STATE_STREAMING_START_DELTA.whole_milliseconds();
-        
+
         if ms_into_slot % 100 == 0 {
             tracing::info!(
                 slot_timestamp = ?self.slot_timestamp,
@@ -207,7 +207,7 @@ impl BlockSealingBidder {
                 "Current time into slot"
             );
         }
-        
+
         should_start
     }
 }
@@ -247,6 +247,7 @@ impl UnfinishedBlockBuildingSink for BlockSealingBidder {
                 "blockNumber": building_context.block_env.number,
                 "blockTimestamp": building_context.block_env.timestamp,
                 "blockUuid": Uuid::new_v4(),
+                "gasRemaing": block.gas_remaining(),
                 "pendingState": pending_state
             });
 
@@ -256,7 +257,7 @@ impl UnfinishedBlockBuildingSink for BlockSealingBidder {
 
             let now = time::OffsetDateTime::now_utc();
             let ms_into_slot = (now - self.slot_timestamp).whole_milliseconds();
-            
+
             info!(
                 seconds_into_slot = ms_into_slot / 100,
                 order_count = block.built_block_trace().included_orders.len(),

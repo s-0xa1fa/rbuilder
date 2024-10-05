@@ -112,4 +112,8 @@ impl BlockBuildingHelper for MockBlockBuildingHelper {
     fn get_bundle_state(&self) -> &BundleState {
         &self.bundle_state
     }
+
+    fn gas_remaining(&self) -> u64 {
+        0
+    }
 }
