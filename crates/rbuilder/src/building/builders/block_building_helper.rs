@@ -8,10 +8,10 @@ use alloy_primitives::{utils::format_ether, U256};
 use reth::revm::cached::CachedReads;
 use reth_db::Database;
 use reth_provider::{BlockReader, DatabaseProviderFactory, StateProviderFactory};
+use revm::db::BundleState;
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, trace};
-use revm::db::BundleState;
 
 use crate::{
     building::{
@@ -20,7 +20,7 @@ use crate::{
         EstimatePayoutGasErr, ExecutionError, ExecutionResult, FinalizeError, FinalizeResult,
         PartialBlock, Sorting,
     },
-    primitives::{Order, SimulatedOrder, SimValue},
+    primitives::{Order, SimValue, SimulatedOrder},
     roothash::RootHashConfig,
     telemetry,
 };
@@ -39,12 +39,12 @@ pub trait BlockBuildingHelper: Send + Sync {
 
     /// Tries to add an order to the end of the block.
     /// Block state changes only on Ok(Ok)
-    fn commit_order(
+    fn commit_sim_order(
         &mut self,
         order: &SimulatedOrder,
     ) -> Result<Result<&ExecutionResult, ExecutionError>, CriticalCommitOrderError>;
 
-    fn commit_raw_order(
+    fn commit_order(
         &mut self,
         order: &Order,
     ) -> Result<Result<&ExecutionResult, ExecutionError>, CriticalCommitOrderError>;
@@ -297,6 +297,7 @@ where
         self.built_block_trace.true_bid_value = true_value;
         Ok(())
     }
+}
 
 impl<P, DB> BlockBuildingHelper for BlockBuildingHelperFromProvider<P, DB>
 where
@@ -307,14 +308,17 @@ where
         + 'static,
 {
     /// Forwards to partial_block and updates trace.
-    fn _commit_order(
+    fn commit_order_internal(
         &mut self,
         order: &Order,
         sim_value: Option<&SimValue>,
     ) -> Result<Result<&ExecutionResult, ExecutionError>, CriticalCommitOrderError> {
-        let result =
-            self.partial_block
-                .commit_order(order, &self.building_ctx, &mut self.block_state, sim_value);
+        let result = self.partial_block.commit_order(
+            order,
+            &self.building_ctx,
+            &mut self.block_state,
+            sim_value,
+        );
         match result {
             Ok(ok_result) => match ok_result {
                 Ok(res) => {
@@ -338,20 +342,19 @@ where
     P: DatabaseProviderFactory<DB> + StateProviderFactory + Clone + 'static,
 {
     /// Forwards to partial_block and updates trace.
-    fn commit_order(
+    fn commit_sim_order(
         &mut self,
         order: &SimulatedOrder,
     ) -> Result<Result<&ExecutionResult, ExecutionError>, CriticalCommitOrderError> {
-        self._commit_order(&order.order, Some(&order.sim_value))
+        self.commit_order_internal(&order.order, Some(&order.sim_value))
     }
 
-    fn commit_raw_order(
+    fn commit_order(
         &mut self,
         order: &Order,
     ) -> Result<Result<&ExecutionResult, ExecutionError>, CriticalCommitOrderError> {
-        self._commit_order(order, None)
+        self.commit_order_internal(order, None)
     }
-
 
     fn set_trace_fill_time(&mut self, time: Duration) {
         self.built_block_trace.fill_time = time;

@@ -1,6 +1,5 @@
 //! order_input handles receiving new orders from the ipc mempool subscription and json rpc server
 //!
-pub mod bob_order_shim;
 pub mod clean_orderpool;
 pub mod order_replacement_manager;
 pub mod order_sink;
@@ -21,7 +20,6 @@ use std::{net::Ipv4Addr, path::PathBuf, sync::Arc, time::Duration};
 use tokio::{sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, trace, warn};
-use uuid::Uuid;
 
 use super::base_config::BaseConfig;
 
@@ -36,9 +34,8 @@ impl OrderPoolSubscriber {
         &self,
         block_number: u64,
         sink: Box<dyn ReplaceableOrderSink>,
-        dump: bool,
     ) -> OrderPoolSubscriptionId {
-        self.orderpool.lock().unwrap().add_sink(block_number, sink, dump)
+        self.orderpool.lock().unwrap().add_sink(block_number, sink)
     }
 
     pub fn remove_sink(
@@ -53,11 +50,10 @@ impl OrderPoolSubscriber {
         &self,
         block_number: u64,
         sink: Box<dyn ReplaceableOrderSink>,
-        dump: bool,
     ) -> AutoRemovingOrderPoolSubscriptionId {
         AutoRemovingOrderPoolSubscriptionId {
             orderpool: self.orderpool.clone(),
-            id: self.add_sink(block_number, sink, dump),
+            id: self.add_sink(block_number, sink),
         }
     }
 }
@@ -88,12 +84,12 @@ pub struct OrderInputConfig {
     /// Input RPC port
     server_port: u16,
     /// Input RPC ip
-    server_ip: Ipv4Addr,
+    pub server_ip: Ipv4Addr,
     /// Input RPC max connections
     serve_max_connections: u32,
     /// All order sources send new ReplaceableOrderPoolCommands through an mpsc::Sender bounded channel.
     /// Timeout to wait when sending to that channel (after that the ReplaceableOrderPoolCommand is lost).
-    results_channel_timeout: Duration,
+    pub results_channel_timeout: Duration,
     /// Size of the bounded channel.
     pub input_channel_buffer_size: usize,
 }
@@ -158,7 +154,6 @@ impl OrderInputConfig {
 pub enum ReplaceableOrderPoolCommand {
     /// New or update order
     Order(Order),
-    BobOrder((Order, Uuid)),
     /// Cancellation for sbundle
     CancelShareBundle(CancelShareBundle),
     CancelBundle(BundleReplacementKey),
@@ -168,7 +163,6 @@ impl ReplaceableOrderPoolCommand {
     pub fn target_block(&self) -> Option<u64> {
         match self {
             ReplaceableOrderPoolCommand::Order(o) => o.target_block(),
-            ReplaceableOrderPoolCommand::BobOrder((o, _)) => o.target_block(),
             ReplaceableOrderPoolCommand::CancelShareBundle(c) => Some(c.block),
             ReplaceableOrderPoolCommand::CancelBundle(_) => None,
         }
@@ -252,9 +246,7 @@ where
                             }
                             o.replacement_key().is_some()
                         },
-                        ReplaceableOrderPoolCommand::BobOrder(_) => false,
-                        ReplaceableOrderPoolCommand::CancelBundle(_)=> true,
-                        ReplaceableOrderPoolCommand::CancelShareBundle(_) => true,
+                        ReplaceableOrderPoolCommand::CancelShareBundle(_)|ReplaceableOrderPoolCommand::CancelBundle(_) => true
                     };
                     !cancellable_order
                 })
@@ -269,9 +261,7 @@ where
                             }
                             o.has_blobs()
                         },
-                        ReplaceableOrderPoolCommand::BobOrder(_) => false,
-                        ReplaceableOrderPoolCommand::CancelShareBundle(_) => false,
-                        ReplaceableOrderPoolCommand::CancelBundle(_) => false,
+                        ReplaceableOrderPoolCommand::CancelShareBundle(_)|ReplaceableOrderPoolCommand::CancelBundle(_) => false
                     };
                     !has_blobs
                 })
