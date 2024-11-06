@@ -467,6 +467,6 @@ where
         if self.partial_block.gas_used > self.partial_block.gas_reserved {
             return 0;
         }
-        return self.partial_block.gas_reserved - self.partial_block.gas_used
+        return self.partial_block.gas_reserved - self.partial_block.gas_used;
     }
 }
