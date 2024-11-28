@@ -12,14 +12,13 @@ use crate::{
     utils::{is_provider_factory_health_error, NonceCache},
 };
 use ahash::HashSet;
-use alloy_primitives::{Address, B256};
+use alloy_primitives::{Address, Bytes, B256};
 use block_building_helper::BlockBuildingHelper;
 use reth::{
     primitives::{BlobTransactionSidecar, SealedBlock},
-    tasks::pool::BlockingTaskPool,
+    revm::cached::CachedReads,
 };
 use reth_db::Database;
-use reth_payload_builder::database::CachedReads;
 use reth_provider::{DatabaseProviderFactory, StateProviderFactory};
 use std::{fmt::Debug, marker::PhantomData, sync::Arc};
 use tokio::sync::{broadcast, broadcast::error::TryRecvError};
@@ -33,6 +32,8 @@ pub struct Block {
     pub sealed_block: SealedBlock,
     /// Sidecars for the txs included in SealedBlock
     pub txs_blobs_sidecars: Vec<Arc<BlobTransactionSidecar>>,
+    /// The Pectra execution requests for this bid.
+    pub execution_requests: Vec<Bytes>,
     pub builder_name: String,
 }
 
@@ -40,7 +41,6 @@ pub struct Block {
 pub struct LiveBuilderInput<P, DB> {
     pub provider: P,
     pub root_hash_config: RootHashConfig,
-    pub root_hash_task_pool: BlockingTaskPool,
     pub ctx: BlockBuildingContext,
     pub input: broadcast::Receiver<SimulatedOrderCommand>,
     pub sink: Arc<dyn UnfinishedBlockBuildingSink>,
@@ -215,7 +215,7 @@ pub struct BlockBuildingAlgorithmInput<P> {
 pub trait BlockBuildingAlgorithm<P, DB>: Debug + Send + Sync
 where
     DB: Database + Clone + 'static,
-    P: DatabaseProviderFactory<DB> + StateProviderFactory + Clone + 'static,
+    P: DatabaseProviderFactory<DB = DB> + StateProviderFactory + Clone + 'static,
 {
     fn name(&self) -> String;
     fn build_blocks(&self, input: BlockBuildingAlgorithmInput<P>);
