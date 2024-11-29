@@ -81,8 +81,8 @@ jobs:
       - name: Setup rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: ${{ matrix.toolchain }}   
-          
+          toolchain: ${{ matrix.toolchain }}
+
       - name: Download builder playground
         uses: flashbots/flashbots-toolchain@v0.1
         with:
