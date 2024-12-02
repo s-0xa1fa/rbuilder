@@ -86,8 +86,6 @@ pub trait BlockBuildingHelper: Send + Sync {
     /// Get the bundle state.
     fn get_bundle_state(&self) -> &BundleState;
 
-    fn gas_remaining(&self) -> u64;
-
     fn commit_order_with_trace(
         &mut self,
         order: &Order,
@@ -466,13 +464,6 @@ where
 
     fn get_bundle_state(&self) -> &BundleState {
         self.block_state.get_bundle_state()
-    }
-
-    fn gas_remaining(&self) -> u64 {
-        if self.partial_block.gas_used > self.partial_block.gas_reserved {
-            return 0;
-        }
-        return self.partial_block.gas_reserved - self.partial_block.gas_used;
     }
 
     fn commit_order_with_trace(
