@@ -198,7 +198,7 @@ async fn run_submit_to_relays_job(
             gas = block.sealed_block.gas_used,
             txs = block.sealed_block.body.transactions.len(),
             bundles,
-            buidler_name = block.builder_name,
+            builder_name = block.builder_name,
             fill_time_ms = block.trace.fill_time.as_millis(),
             finalize_time_ms = block.trace.finalize_time.as_millis(),
         );
