@@ -6,21 +6,29 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      build-docker:
-        description: "Build Docker"
-        required: false
-        type: boolean
-        default: false
-      build-binary:
-        description: "Build Binary"
-        required: false
-        type: boolean
-        default: true
       draft-release:
+        default: false
         description: "Draft Release"
         required: false
         type: boolean
+      build-docker:
         default: false
+        description: "Build Docker"
+        required: false
+        type: boolean
+      build-binary:
+        default: true
+        description: "Build Binary"
+        required: false
+        type: boolean
+      features:
+        default: ''
+        description: "Binary Compilation Features"
+        options:
+          - ''
+          - 'redact-sensitive'
+        required: false
+        type: choice
 
 jobs:
   extract-version:
@@ -35,14 +43,10 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             VERSION="${GITHUB_REF#refs/tags/}"
           else
-            SHA_SHORT="$(echo ${GITHUB_SHA} | cut -c1-7)"
-            BRANCH_NAME_SAFE="${GITHUB_REF_NAME//\//-}"  # replaces "/" in branch name with "-"
-            VERSION="${BRANCH_NAME_SAFE}-${SHA_SHORT}"
+            VERSION="$(echo ${GITHUB_SHA} | cut -c1-7)"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "${VERSION}"
 
-          echo "### Version: \`${VERSION}\`" >> $GITHUB_STEP_SUMMARY
           echo "|                     |                        |" >> $GITHUB_STEP_SUMMARY
           echo "| ------------------- | ---------------------- |" >> $GITHUB_STEP_SUMMARY
           echo "| \`GITHUB_REF_TYPE\` | \`${GITHUB_REF_TYPE}\` |" >> $GITHUB_STEP_SUMMARY
@@ -50,6 +54,7 @@ jobs:
           echo "| \`GITHUB_REF\`      | \`${GITHUB_REF}\`      |" >> $GITHUB_STEP_SUMMARY
           echo "| \`GITHUB_SHA\`      | \`${GITHUB_SHA}\`      |" >> $GITHUB_STEP_SUMMARY
           echo "| \`VERSION\`         | \`${VERSION}\`         |" >> $GITHUB_STEP_SUMMARY
+          echo "| \`FEATURES\`        | \`${{ github.event.inputs.features || 'none' }}\` |" >> $GITHUB_STEP_SUMMARY
 
   build-binary:
     name: Build binary
@@ -58,8 +63,6 @@ jobs:
     runs-on: ${{ matrix.configs.runner }}
     container:
       image: ubuntu:22.04
-    env:
-      VERSION: ${{ needs.extract-version.outputs.VERSION }}
     permissions:
       contents: write
       packages: write
@@ -74,8 +77,7 @@ jobs:
           # - target: aarch64-apple-darwin
           #   runner: warp-macos-14-arm64-6x
         features:
-          - ""
-          - "redact-sensitive"
+          - ${{ github.event.inputs.features || '' }}
 
     steps:
       - name: Install dependencies
@@ -102,13 +104,13 @@ jobs:
       - name: Upload rbuilder artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rbuilder-${{ matrix.configs.target }}${{ matrix.features && '-' }}${{ matrix.features }}
+          name: rbuilder-${{ needs.extract-version.outputs.VERSION }}-${{ matrix.configs.target }}${{ matrix.features && '-' }}${{ matrix.features }}
           path: target/${{ matrix.configs.target }}/release/rbuilder
 
       - name: Upload reth-rbuilder artifact
         uses: actions/upload-artifact@v4
         with:
-          name: reth-rbuilder-${{ matrix.configs.target }}${{ matrix.features && '-' }}${{ matrix.features }}
+          name: reth-rbuilder-${{ needs.extract-version.outputs.VERSION }}-${{ matrix.configs.target }}${{ matrix.features && '-' }}${{ matrix.features }}
           path: target/${{ matrix.configs.target }}/release/reth-rbuilder
 
   draft-release:
@@ -174,7 +176,6 @@ jobs:
       - name: docker buildx
         uses: docker/setup-buildx-action@v3
 
-      # https://github.com/docker/metadata-action
       - name: docker metadata
         uses: docker/metadata-action@v5
         id: meta
