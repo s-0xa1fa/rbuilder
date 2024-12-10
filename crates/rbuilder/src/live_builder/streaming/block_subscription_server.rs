@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use jsonrpsee::core::id_providers::RandomStringIdProvider;
 use jsonrpsee::server::{RpcModule, Server};
+use jsonrpsee::types::error::ErrorObjectOwned;
 use jsonrpsee::{PendingSubscriptionSink, SubscriptionMessage};
 use serde_json::Value;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
@@ -30,7 +31,14 @@ pub async fn start_block_subscription_server(
             "eth_subscribe",
             "eth_subscription",
             "eth_unsubscribe",
-            |_params, pending, ctx| async move {
+            |params, pending, ctx| async move {
+                let topic: String = params.one()?;
+                if topic != "flashbots_stateDiffs" {
+                    let _ = pending
+                        .reject(ErrorObjectOwned::owned(-32000, "Unknown topic", Some("")))
+                        .await;
+                    return Ok(());
+                }
                 let rx = ctx.subscribe();
                 let stream = BroadcastStream::new(rx);
                 pipe_from_stream(pending, stream).await?;
