@@ -35,7 +35,7 @@ impl OrderPoolSubscriber {
         block_number: u64,
         sink: Box<dyn ReplaceableOrderSink>,
     ) -> OrderPoolSubscriptionId {
-        self.orderpool.lock().unwrap().add_sink(block_number, sink)
+        self.orderpool.lock().add_sink(block_number, sink)
     }
 
     pub fn remove_sink(

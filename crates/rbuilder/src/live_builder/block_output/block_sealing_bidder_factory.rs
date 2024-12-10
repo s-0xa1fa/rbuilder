@@ -6,7 +6,6 @@ use alloy_primitives::U256;
 use reth_provider::{HeaderProvider, StateProviderFactory};
 use std::{fmt::Debug, sync::Arc};
 use tracing::error;
-use uuid::Uuid;
 
 use super::{
     bid_value_source::interfaces::{BidValueObs, BidValueSource},

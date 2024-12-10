@@ -300,16 +300,7 @@ where
         self.built_block_trace.true_bid_value = true_value;
         Ok(())
     }
-}
 
-impl<P, DB> BlockBuildingHelper for BlockBuildingHelperFromProvider<P, DB>
-where
-    DB: Database + Clone + 'static,
-    P: DatabaseProviderFactory<DB = DB, Provider: BlockReader>
-        + StateProviderFactory
-        + Clone
-        + 'static,
-{
     /// Forwards to partial_block and updates trace.
     fn commit_order_internal(
         &mut self,
@@ -342,9 +333,11 @@ where
 impl<P, DB> BlockBuildingHelper for BlockBuildingHelperFromProvider<P, DB>
 where
     DB: Database + Clone + 'static,
-    P: DatabaseProviderFactory<DB> + StateProviderFactory + Clone + 'static,
+    P: DatabaseProviderFactory<DB = DB, Provider: BlockReader>
+        + StateProviderFactory
+        + Clone
+        + 'static,
 {
-    /// Forwards to partial_block and updates trace.
     fn commit_sim_order(
         &mut self,
         order: &SimulatedOrder,
@@ -473,7 +466,7 @@ where
         let result = self.partial_block.commit_order_with_trace(
             order,
             &self.building_ctx,
-            &mut self.block_state
+            &mut self.block_state,
         );
         match result {
             Ok(ok_result) => match ok_result {

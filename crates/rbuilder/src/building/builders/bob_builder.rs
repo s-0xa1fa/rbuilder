@@ -7,7 +7,7 @@ use crate::{
     },
 };
 use ahash::HashMap;
-use alloy_primitives::{B256, U256};
+use alloy_primitives::{map::B256HashMap, B256, U256};
 use alloy_rpc_types_eth::state::{AccountOverride, StateOverride};
 use jsonrpsee::{types::ErrorObject, RpcModule};
 use revm::db::BundleState;
@@ -26,9 +26,9 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, trace, warn};
 use uuid::Uuid;
 
-use priority_queue::PriorityQueue;
-use crate::primitives::{OrderId, SimulatedOrder};
 use crate::building::evm_inspector::UsedStateTrace;
+use crate::primitives::{OrderId, SimulatedOrder};
+use priority_queue::PriorityQueue;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(default, deny_unknown_fields)]
@@ -251,7 +251,6 @@ pub struct BobHandle {
 }
 
 impl UnfinishedBlockBuildingSink for BobHandle {
-
     /// BobHandle is passed as the sink for all other algorithms
     /// When a new block is received, we:
     /// 1. Stream the block to searchers
@@ -259,11 +258,13 @@ impl UnfinishedBlockBuildingSink for BobHandle {
     /// 3. Pass the block to BlockSealingBidder
     fn new_block(&self, mut block: Box<dyn BlockBuildingHelper>) {
         if !self.inner.check_stream(&block) {
-            return
+            return;
         }
 
         let block_uuid = Uuid::new_v4();
-        self.inner.builder.register_block(block_uuid, Arc::downgrade(&self.inner));
+        self.inner
+            .builder
+            .register_block(block_uuid, Arc::downgrade(&self.inner));
         // Stream the block to searchers
         self.inner.stream_block(block_uuid, block.box_clone());
         // Try to fill with cached bundle orders
@@ -273,10 +274,12 @@ impl UnfinishedBlockBuildingSink for BobHandle {
     }
 
     fn can_use_suggested_fee_recipient_as_coinbase(&self) -> bool {
-        return self.inner.sink.can_use_suggested_fee_recipient_as_coinbase();
+        return self
+            .inner
+            .sink
+            .can_use_suggested_fee_recipient_as_coinbase();
     }
 }
-
 
 /// PrioritizedOrder combines a SimulatedOrder with its profit value
 /// Used for ordering orders in a priority queue based on profit
@@ -371,10 +374,13 @@ impl BobHandleInner {
 
                 // Insert into bundle store under mutex protection
                 let mut bundle_store = self.bundle_store.lock().unwrap();
-                bundle_store.push(execution_result.order.id(), PrioritizedOrder {
+                bundle_store.push(
+                    execution_result.order.id(),
+                    PrioritizedOrder {
                         order: sim_order,
                         profit,
-                });
+                    },
+                );
 
                 // Pass stored partial block with bob order to sink
                 self.sink.new_block(block);
@@ -486,7 +492,10 @@ impl BobHandleInner {
             // Check if the address exists in bundle_state
             if let Some(bundle_account) = bundle_state.state.get(&read_slot_key.address) {
                 // If address exists, check if the specific storage slot read still has the same value
-                if let Some(storage_slot) = bundle_account.storage.get(&U256::try_from(read_slot_key.key).unwrap()) {
+                if let Some(storage_slot) = bundle_account
+                    .storage
+                    .get(&U256::try_from(read_slot_key.key).unwrap())
+                {
                     let original_value = U256::from_be_bytes(value.0);
                     if storage_slot.present_value != original_value {
                         info!(
@@ -594,7 +603,7 @@ fn bundle_state_to_state_overrides(bundle_state: &BundleState) -> StateOverride 
                 .get(&info.code_hash)
                 .map(|code| code.bytes().clone());
 
-            let storage_diff: std::collections::HashMap<B256, B256> = bundle_account
+            let storage_diff: B256HashMap<B256> = bundle_account
                 .storage
                 .iter()
                 .map(|(slot, storage_slot)| {
@@ -610,6 +619,7 @@ fn bundle_state_to_state_overrides(bundle_state: &BundleState) -> StateOverride 
                     true => None,
                 },
                 state: None,
+                move_precompile_to: None,
             };
 
             Some((*address, account_override))
